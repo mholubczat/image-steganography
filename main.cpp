@@ -1,33 +1,18 @@
 #include <iostream>
 #include <cstring>
+#include <sys/stat.h>
 
 using namespace std;
 
-const string missingParameters = "Missing parameter(s). Enter -h for more information.";
+void info(const char *path);
 
-void info(const char *path) {
-    if(!path) throw invalid_argument(missingParameters);
-    cout << "Info, path:" << path << endl;
-}
+void encrypt(const char *path, const char *message);
 
-void encrypt(const char *path, const char *message) {
-    if(!path || !message) throw invalid_argument(missingParameters);
-    cout << "Encrypt, path: " << path << " message: " << message << endl;
-}
+void decrypt(const char *path);
 
-void decrypt(const char *path) {
-    if(!path) throw invalid_argument(missingParameters);
-    cout << "Decrypt, path:" << path << endl;
-}
+void check(const char *path, const char *message);
 
-void check(const char *path, const char *message) {
-    if(!path || !message) throw invalid_argument(missingParameters);
-    cout << "Check, path: " << path << " message: " << message << endl;
-}
-
-void help() {
-    cout << "Help" << endl;
-}
+void help();
 
 int main(int argc, char *argv[]) {
     for (int i = 0; i < argc; i++) {
@@ -44,8 +29,8 @@ int main(int argc, char *argv[]) {
             continue;
         }
         if (strcmp(argv[i], "-e") == 0 || strcmp(argv[i], "--encrypt") == 0) {
-            const char* path = argv[++i];
-            const char* message = argv[++i];
+            const char *path = argv[++i];
+            const char *message = argv[++i];
             encrypt(path, message);
             continue;
         }
@@ -54,8 +39,8 @@ int main(int argc, char *argv[]) {
             continue;
         }
         if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--check") == 0) {
-            const char* path = argv[++i];
-            const char* message = argv[++i];
+            const char *path = argv[++i];
+            const char *message = argv[++i];
             check(path, message);
             continue;
         }
@@ -63,4 +48,52 @@ int main(int argc, char *argv[]) {
         throw runtime_error(invalidOption);
     }
     return 0;
+}
+
+const string missingParameters = "Missing parameter(s). Enter -h for more information.";
+
+#ifdef WIN32
+#define stat _stat
+#endif
+
+string tryGetExtension(const char *path) {
+    string extension;
+    if (strlen(path) < 4 || (extension = string(path).substr(strlen(path) - 4, 4)) != ".bmp") {
+        throw invalid_argument("File not supported.");
+    }
+    return extension;
+}
+
+void info(const char *path) {
+    if (!path) throw invalid_argument(missingParameters);
+
+    struct stat fileStats{};
+    if (stat(path, &fileStats) != 0) throw invalid_argument("File not found.");
+
+    cout << "Extension:" << '\t' << tryGetExtension(path) << endl;
+    cout << "Size:\t" << '\t' << fileStats.st_size << endl;
+    cout << "Size on disk: " << '\t' << fileStats.st_blocks * 512 << endl;
+    cout << "Last modified: " << '\t' << fileStats.st_mtime << endl;
+}
+
+void encrypt(const char *path, const char *message) {
+    if (!path || !message) throw invalid_argument(missingParameters);
+    string extension = tryGetExtension(path);
+    cout << "Encrypt, path: " << path << " message: " << message << endl;
+}
+
+void decrypt(const char *path) {
+    if (!path) throw invalid_argument(missingParameters);
+    const string extension = tryGetExtension(path);
+    cout << "Decrypt, path:" << path << endl;
+}
+
+void check(const char *path, const char *message) {
+    if (!path || !message) throw invalid_argument(missingParameters);
+    string extension = tryGetExtension(path);
+    cout << "Check, path: " << path << " message: " << message << endl;
+}
+
+void help() {
+    cout << "Help" << endl;
 }
