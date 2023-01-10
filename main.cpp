@@ -1,6 +1,18 @@
 #include <iostream>
+#include <fstream>
 #include <cstring>
 #include <sys/stat.h>
+#include <vector>
+
+#define BIT_ONE 0x01
+#define BIT_TWO 0x02
+#define BIT_THREE 0x04
+#define BIT_FOUR 0x08
+#define BIT_FIVE 0x10
+#define BIT_SIX 0x20
+#define BIT_SEVEN 0x40
+#define BIT_EIGHT 0x80
+#define BIT_BUT_ONE 0xFE
 
 using namespace std;
 
@@ -79,9 +91,65 @@ void info(const char *&path) {
 }
 
 void encrypt(const char *&path, const char *&message) {
+    clock_t start = clock();
     if (!path || !message) throw invalid_argument(missingParameters);
     string extension = tryGetExtension(path);
     cout << "Encrypt, path: " << path << " message: " << message << endl;
+    if (extension == ".bmp") {
+        fstream file(path, ios::in | ios::out | ios::binary);
+        file.seekg(0, ios::end);
+        long size = file.tellg();
+        int offset = 0;
+        uint8_t bitPerPixel = 0;
+        int biWidth = 0;
+        int biHeight = 0;
+        // READ HEADER DATA
+        file.seekg(10, ios::beg);
+        for (int i = 0; i < 4; i++) {
+            offset += (file.get() << 8 * i);
+        }
+        file.seekg(28, ios::beg);
+        for (int i = 0; i < 2; i++) {
+            bitPerPixel += (file.get() << 8 * i);
+        }
+        file.seekg(18, ios::beg);
+        for (int i = 0; i < 4; i++) {
+            biWidth += (file.get() << 8 * i);
+        }
+        file.seekg(22, ios::beg);
+        for (int i = 0; i < 4; i++) {
+            biHeight += (file.get() << 8 * i);
+        }
+        string newFilePath = string(path).substr(0, strlen(path) - 4).append(" encrypted.bmp");
+        ofstream newFile(newFilePath, ios::binary);
+        file.seekg(0, ios::beg);
+        vector<char8_t> bits = {BIT_ONE, BIT_TWO, BIT_THREE, BIT_FOUR, BIT_FIVE, BIT_SIX, BIT_SEVEN, BIT_EIGHT};
+        size_t msgCounter = 0;
+        for (int i = 0; i < size; i++) {
+            if (msgCounter == strlen(message) || i < offset) {
+                newFile << file.rdbuf();
+            } else
+                for (; msgCounter < strlen(message); msgCounter++) {
+                    for (uint8_t b: bits) {
+                        newFile.put((file.get() & BIT_BUT_ONE) + (message[msgCounter] & b));
+                        i++;
+                        for (uint8_t j = 1; j < bitPerPixel / 8; j++) {
+                            newFile << file.rdbuf();
+                            i++;
+                        }
+                    }
+                }
+        }
+        newFile.close();
+        file.close();
+        clock_t stop = clock();
+        double elapsed = (double) (stop - start) / CLOCKS_PER_SEC;
+        printf("\nTime elapsed: %.5f\n", elapsed);
+    }
+
+    if (extension == ".png") {
+
+    }
 }
 
 void decrypt(const char *&path) {
