@@ -1,3 +1,0 @@
-/home/mholubczat/Documents/Studia/Sem3/PJC/image-steganography/cmake-build-debug/CMakeFiles/image_steganography.dir
-/home/mholubczat/Documents/Studia/Sem3/PJC/image-steganography/cmake-build-debug/CMakeFiles/edit_cache.dir
-/home/mholubczat/Documents/Studia/Sem3/PJC/image-steganography/cmake-build-debug/CMakeFiles/rebuild_cache.dir
