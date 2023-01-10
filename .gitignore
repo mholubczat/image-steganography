@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+isten
+
+# Test images
+*.bmp
+*.png
+*.ppm
