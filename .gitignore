@@ -76,4 +76,10 @@ fabric.properties
 
 # Test images
 *.bmp
+*.png
+
+# Others
+.idea/
+cmake-build-debug/
 isten
+*.xml

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
+
 #include <sys/stat.h>
 #include <vector>
 
@@ -12,7 +13,6 @@
 #define BIT_SIX 0x20
 #define BIT_SEVEN 0x40
 #define BIT_EIGHT 0x80
-#define BIT_BUT_ONE 0xFE
 
 using namespace std;
 
@@ -25,6 +25,12 @@ void decrypt(const char *&path);
 void check(const char *&path, const char *&message);
 
 void help();
+
+void printBits(char c) {
+    cout << ((c & BIT_EIGHT) >> 7) << ((c & BIT_SEVEN) >> 6) << ((c & BIT_SIX) >> 5)
+         << ((c & BIT_FIVE) >> 4) << ((c & BIT_FOUR) >> 3) << ((c & BIT_THREE) >> 2)
+         << ((c & BIT_TWO) >> 1) << ((c & BIT_ONE)) << endl;
+}
 
 int main(int argc, char *argv[]) {
     for (int i = 0; i < argc; i++) {
@@ -94,13 +100,14 @@ void encrypt(const char *&path, const char *&message) {
     clock_t start = clock();
     if (!path || !message) throw invalid_argument(missingParameters);
     string extension = tryGetExtension(path);
+    string myMessage = string(message).append("/END");
     cout << "Encrypt, path: " << path << " message: " << message << endl;
     if (extension == ".bmp") {
         fstream file(path, ios::in | ios::out | ios::binary);
         file.seekg(0, ios::end);
         long size = file.tellg();
         int offset = 0;
-        uint8_t bitPerPixel = 0;
+        int bitPerPixel = 0;
         int biWidth = 0;
         int biHeight = 0;
         // READ HEADER DATA
@@ -123,22 +130,26 @@ void encrypt(const char *&path, const char *&message) {
         string newFilePath = string(path).substr(0, strlen(path) - 4).append(" encrypted.bmp");
         ofstream newFile(newFilePath, ios::binary);
         file.seekg(0, ios::beg);
-        vector<char8_t> bits = {BIT_ONE, BIT_TWO, BIT_THREE, BIT_FOUR, BIT_FIVE, BIT_SIX, BIT_SEVEN, BIT_EIGHT};
+        vector<int> bits = {BIT_ONE, BIT_TWO, BIT_THREE, BIT_FOUR, BIT_FIVE, BIT_SIX, BIT_SEVEN, BIT_EIGHT};
         size_t msgCounter = 0;
+        char c;
+        file.seekg(0, ios::beg);
         for (int i = 0; i < size; i++) {
-            if (msgCounter == strlen(message) || i < offset) {
-                newFile << file.rdbuf();
-            } else
-                for (; msgCounter < strlen(message); msgCounter++) {
+            if (msgCounter >= myMessage.length() || i < offset) {
+                c = file.get();
+                newFile.put(c);
+            } else {
+                for (; msgCounter < myMessage.length(); msgCounter++) {
                     for (uint8_t b: bits) {
-                        newFile.put((file.get() & BIT_BUT_ONE) + (message[msgCounter] & b));
-                        i++;
-                        for (uint8_t j = 1; j < bitPerPixel / 8; j++) {
-                            newFile << file.rdbuf();
+                        c = ((file.get() & (~b)) + (myMessage[msgCounter] & b));
+                        newFile.put(c);
+                        for (int j = 1; j < bitPerPixel / 8; j++) {
+                            newFile.put(file.get());
                             i++;
                         }
                     }
                 }
+            }
         }
         newFile.close();
         file.close();
@@ -146,16 +157,66 @@ void encrypt(const char *&path, const char *&message) {
         double elapsed = (double) (stop - start) / CLOCKS_PER_SEC;
         printf("\nTime elapsed: %.5f\n", elapsed);
     }
-
     if (extension == ".png") {
 
     }
 }
 
 void decrypt(const char *&path) {
+    clock_t start = clock();
     if (!path) throw invalid_argument(missingParameters);
     const string extension = tryGetExtension(path);
     cout << "Decrypt, path:" << path << endl;
+    if (extension == ".bmp") {
+        fstream file(path, ios::in | ios::binary);
+        file.seekg(0, ios::end);
+        long size = file.tellg();
+        int offset = 0;
+        int bitPerPixel = 0;
+        int biWidth = 0;
+        int biHeight = 0;
+        // READ HEADER DATA
+        file.seekg(10, ios::beg);
+        for (int i = 0; i < 4; i++) {
+            offset += (file.get() << 8 * i);
+        }
+        file.seekg(28, ios::beg);
+        for (int i = 0; i < 2; i++) {
+            bitPerPixel += (file.get() << 8 * i);
+        }
+        file.seekg(18, ios::beg);
+        for (int i = 0; i < 4; i++) {
+            biWidth += (file.get() << 8 * i);
+        }
+        file.seekg(22, ios::beg);
+        for (int i = 0; i < 4; i++) {
+            biHeight += (file.get() << 8 * i);
+        }
+        char c = 0;
+        char *message = new char[size];
+        int currOffset = offset - 3;
+        vector<char8_t> bits = {BIT_ONE, BIT_TWO, BIT_THREE, BIT_FOUR, BIT_FIVE, BIT_SIX, BIT_SEVEN,
+                                BIT_EIGHT};
+
+        for (int i = 0; i < size / bitPerPixel; i++) {
+            for (char8_t b: bits) {
+                file.seekg(currOffset += bitPerPixel / 8, ios::beg);
+                c = file.get();
+                message[i] += (c & b);
+            }
+            if (message[i] == 'D') {
+                if (string(message).substr(strlen(message)-4,4) == "/END") {
+                    break;
+                }
+            }
+        }
+        cout << "Decrypted message: " << string(message).erase(strlen(message) - 4) << endl;
+        delete[] message;
+        file.close();
+        clock_t stop = clock();
+        double elapsed = (double) (stop - start) / CLOCKS_PER_SEC;
+        printf("\nTime elapsed: %.5f\n", elapsed);
+    }
 }
 
 void check(const char *&path, const char *&message) {
@@ -167,3 +228,4 @@ void check(const char *&path, const char *&message) {
 void help() {
     cout << "Help" << endl;
 }
+
