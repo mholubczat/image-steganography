@@ -4,13 +4,13 @@
 
 using namespace std;
 
-void info(const char *path);
+void info(const char *&path);
 
-void encrypt(const char *path, const char *message);
+void encrypt(const char *&path, const char *&message);
 
-void decrypt(const char *path);
+void decrypt(const char *&path);
 
-void check(const char *path, const char *message);
+void check(const char *&path, const char *&message);
 
 void help();
 
@@ -25,7 +25,8 @@ int main(int argc, char *argv[]) {
             continue;
         }
         if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--info") == 0) {
-            info(argv[++i]);
+            const char *path = argv[++i];
+            info(path);
             continue;
         }
         if (strcmp(argv[i], "-e") == 0 || strcmp(argv[i], "--encrypt") == 0) {
@@ -35,7 +36,8 @@ int main(int argc, char *argv[]) {
             continue;
         }
         if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--decrypt") == 0) {
-            decrypt(argv[++i]);
+            const char *path = argv[++i];
+            decrypt(path);
             continue;
         }
         if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--check") == 0) {
@@ -64,7 +66,7 @@ string tryGetExtension(const char *path) {
     return extension;
 }
 
-void info(const char *path) {
+void info(const char *&path) {
     if (!path) throw invalid_argument(missingParameters);
 
     struct stat fileStats{};
@@ -76,19 +78,19 @@ void info(const char *path) {
     cout << "Last modified: " << '\t' << fileStats.st_mtime << endl;
 }
 
-void encrypt(const char *path, const char *message) {
+void encrypt(const char *&path, const char *&message) {
     if (!path || !message) throw invalid_argument(missingParameters);
     string extension = tryGetExtension(path);
     cout << "Encrypt, path: " << path << " message: " << message << endl;
 }
 
-void decrypt(const char *path) {
+void decrypt(const char *&path) {
     if (!path) throw invalid_argument(missingParameters);
     const string extension = tryGetExtension(path);
     cout << "Decrypt, path:" << path << endl;
 }
 
-void check(const char *path, const char *message) {
+void check(const char *&path, const char *&message) {
     if (!path || !message) throw invalid_argument(missingParameters);
     string extension = tryGetExtension(path);
     cout << "Check, path: " << path << " message: " << message << endl;

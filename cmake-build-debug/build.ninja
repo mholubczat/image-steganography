@@ -55,12 +55,6 @@ build CMakeFiles/image_steganography.dir/main.cpp.o: CXX_COMPILER__image_stegano
   OBJECT_DIR = CMakeFiles/image_steganography.dir
   OBJECT_FILE_DIR = CMakeFiles/image_steganography.dir
 
-build CMakeFiles/image_steganography.dir/MissingParametersException.cpp.o: CXX_COMPILER__image_steganography_Debug /home/mholubczat/Documents/Studia/Sem3/PJC/image-steganography/MissingParametersException.cpp || cmake_object_order_depends_target_image_steganography
-  DEP_FILE = CMakeFiles/image_steganography.dir/MissingParametersException.cpp.o.d
-  FLAGS = -g -fdiagnostics-color=always -std=gnu++23
-  OBJECT_DIR = CMakeFiles/image_steganography.dir
-  OBJECT_FILE_DIR = CMakeFiles/image_steganography.dir
-
 
 # =============================================================================
 # Link build statements for EXECUTABLE target image_steganography
@@ -69,7 +63,7 @@ build CMakeFiles/image_steganography.dir/MissingParametersException.cpp.o: CXX_C
 #############################################
 # Link the executable image_steganography
 
-build image_steganography: CXX_EXECUTABLE_LINKER__image_steganography_Debug CMakeFiles/image_steganography.dir/main.cpp.o CMakeFiles/image_steganography.dir/MissingParametersException.cpp.o
+build image_steganography: CXX_EXECUTABLE_LINKER__image_steganography_Debug CMakeFiles/image_steganography.dir/main.cpp.o
   FLAGS = -g
   OBJECT_DIR = CMakeFiles/image_steganography.dir
   POST_BUILD = :
