@@ -77,6 +77,7 @@ fabric.properties
 # Test images
 *.bmp
 *.png
+*.ppm
 
 # Others
 .idea/

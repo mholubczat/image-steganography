@@ -13,6 +13,7 @@
 #define BIT_SIX 0x20
 #define BIT_SEVEN 0x40
 #define BIT_EIGHT 0x80
+#define BITS_TWO_EIGHT 0XFE
 
 using namespace std;
 
@@ -33,6 +34,7 @@ void printBits(char c) {
 }
 
 int main(int argc, char *argv[]) {
+    clock_t start = clock();
     for (int i = 0; i < argc; i++) {
         if (i == 0) {
             if (argc == 1) help();
@@ -67,18 +69,23 @@ int main(int argc, char *argv[]) {
         string invalidOption = "Invalid option \"" + string(argv[i]) + "\". Enter -h for more information";
         throw runtime_error(invalidOption);
     }
+    clock_t stop = clock();
+    double elapsed = (double) (stop - start) / CLOCKS_PER_SEC;
+    printf("\nTime elapsed: %.5f\n", elapsed);
     return 0;
 }
 
 const string missingParameters = "Missing parameter(s). Enter -h for more information.";
 
+vector<int> bits = {BIT_ONE, BIT_TWO, BIT_THREE, BIT_FOUR, BIT_FIVE, BIT_SIX, BIT_SEVEN, BIT_EIGHT};
 #ifdef WIN32
 #define stat _stat
 #endif
 
 string tryGetExtension(const char *path) {
     string extension;
-    if (strlen(path) < 4 || (extension = string(path).substr(strlen(path) - 4, 4)) != ".bmp") {
+    extension = string(path).substr(strlen(path) - 4, 4);
+    if (strlen(path) < 4 || !((extension == ".bmp") || (extension == ".ppm"))) {
         throw invalid_argument("File not supported.");
     }
     return extension;
@@ -96,127 +103,181 @@ void info(const char *&path) {
     cout << "Last modified: " << '\t' << fileStats.st_mtime << endl;
 }
 
+//TODO add some try catch? for larger chars. and discard comments: from # to /r or /n
+int readAsciiInt(fstream &file, ofstream &newFile) {
+    int res = 0;
+    char read;
+    do {
+        read = (char) file.get();
+        newFile.put(read);
+    } while (read < '0');
+    do {
+        res *= 10;
+        res += (read - 48);
+        read = (char) file.get();
+        newFile.put(read);
+    } while (read >= '0');
+    return res;
+}
+
+void encryptAsciiPpm(const string &myMessage, ofstream &newFile, fstream &file) {
+    char read, temp;
+    for (char msgCounter: myMessage) {
+        for (uint8_t b: bits) {
+            readAsciiInt(file, newFile);
+            readAsciiInt(file, newFile);
+            do {
+                read = (char) file.get();
+                if (read < '0') newFile.put(read);
+            } while (read < '0');
+            while (read >= '0') {
+                temp = read;
+                read = (char) file.get();
+                if (read < '0') {
+                    temp = (char) (temp & BITS_TWO_EIGHT);
+                    if ((msgCounter & b) != 0) temp++;
+                }
+                newFile.put(temp);
+            }
+            newFile.put(read);
+        }
+    }
+}
+
+void readBmpHeader(fstream &file, int &offset, int &bitPerPixel) {
+    offset= 0;
+    bitPerPixel= 0;
+    int biWidth = 0;
+    int biHeight = 0;
+    // READ HEADER DATA
+    file.seekg(10, ios::beg);
+    for (int i = 0; i < 4; i++) {
+        offset += (file.get() << 8 * i);
+    }
+    file.seekg(28, ios::beg);
+    for (int i = 0; i < 2; i++) {
+        bitPerPixel += (file.get() << 8 * i);
+    }
+    file.seekg(18, ios::beg);
+    for (int i = 0; i < 4; i++) {
+        biWidth += (file.get() << 8 * i);
+    }
+    file.seekg(22, ios::beg);
+    for (int i = 0; i < 4; i++) {
+        biHeight += (file.get() << 8 * i);
+    }
+    file.seekg(0, ios::beg);
+}
+
+void readPpmHeader(ofstream &newFile, fstream &file, bool &isAscii) {
+    char read;
+    file.seekg(0, ios::beg);
+    read = (char) file.get();
+    if (read != 'P') throw invalid_argument("Incorrect data. The file is corrupted.");
+    newFile.put(read);
+    read = (char) file.get();
+    newFile.put(read);
+    switch (read) {
+        case '3':
+            isAscii = true;
+            break;
+        case '6':
+            isAscii = false;
+            break;
+        default:
+            throw invalid_argument("Incorrect data. The file is corrupted.");
+    }
+    int width = readAsciiInt(file, newFile);
+    int height = readAsciiInt(file, newFile);
+    int maxVal = readAsciiInt(file, newFile);
+    if (maxVal > 255) throw invalid_argument("File not supported");
+}
+
 void encrypt(const char *&path, const char *&message) {
-    clock_t start = clock();
     if (!path || !message) throw invalid_argument(missingParameters);
     string extension = tryGetExtension(path);
     string myMessage = string(message).append("/END");
     cout << "Encrypt, path: " << path << " message: " << message << endl;
+    string newFilePath = string(path).substr(0, strlen(path) - 4).append(" encrypted").append(extension);
+    ofstream newFile(newFilePath, ios::binary);
+    size_t msgCounter = 0;
+    fstream file(path, ios::in | ios::out | ios::binary);
+    file.seekg(0, ios::end);
+    long size = file.tellg();
+    char read;
     if (extension == ".bmp") {
-        fstream file(path, ios::in | ios::out | ios::binary);
-        file.seekg(0, ios::end);
-        long size = file.tellg();
-        int offset = 0;
-        int bitPerPixel = 0;
-        int biWidth = 0;
-        int biHeight = 0;
-        // READ HEADER DATA
-        file.seekg(10, ios::beg);
-        for (int i = 0; i < 4; i++) {
-            offset += (file.get() << 8 * i);
-        }
-        file.seekg(28, ios::beg);
-        for (int i = 0; i < 2; i++) {
-            bitPerPixel += (file.get() << 8 * i);
-        }
-        file.seekg(18, ios::beg);
-        for (int i = 0; i < 4; i++) {
-            biWidth += (file.get() << 8 * i);
-        }
-        file.seekg(22, ios::beg);
-        for (int i = 0; i < 4; i++) {
-            biHeight += (file.get() << 8 * i);
-        }
-        string newFilePath = string(path).substr(0, strlen(path) - 4).append(" encrypted.bmp");
-        ofstream newFile(newFilePath, ios::binary);
-        file.seekg(0, ios::beg);
-        vector<int> bits = {BIT_ONE, BIT_TWO, BIT_THREE, BIT_FOUR, BIT_FIVE, BIT_SIX, BIT_SEVEN, BIT_EIGHT};
-        size_t msgCounter = 0;
-        char c;
-        file.seekg(0, ios::beg);
+        int offset;
+        int bitPerPixel;
+        readBmpHeader(file, offset, bitPerPixel);
         for (int i = 0; i < size; i++) {
             if (msgCounter >= myMessage.length() || i < offset) {
-                c = file.get();
-                newFile.put(c);
+                read = (char) file.get();
+                newFile.put(read);
             } else {
                 for (; msgCounter < myMessage.length(); msgCounter++) {
                     for (uint8_t b: bits) {
-                        c = ((file.get() & (~b)) + (myMessage[msgCounter] & b));
-                        newFile.put(c);
+                        read = (char) ((file.get() & (~b)) + (myMessage[msgCounter] & b));
+                        newFile.put(read);
                         for (int j = 1; j < bitPerPixel / 8; j++) {
-                            newFile.put(file.get());
+                            newFile.put((char) file.get());
                             i++;
                         }
                     }
                 }
             }
         }
-        newFile.close();
-        file.close();
-        clock_t stop = clock();
-        double elapsed = (double) (stop - start) / CLOCKS_PER_SEC;
-        printf("\nTime elapsed: %.5f\n", elapsed);
     }
-    if (extension == ".png") {
-
+    if (extension == ".ppm") {
+        bool isAscii;
+        readPpmHeader(newFile, file, isAscii);
+        if(isAscii)
+        encryptAsciiPpm(myMessage, newFile, file);
+        else;
+        while (file.good()) {
+            read = (char) file.get();
+            newFile.put(read);
+        }
     }
+    newFile.close();
+    file.close();
 }
 
 void decrypt(const char *&path) {
-    clock_t start = clock();
     if (!path) throw invalid_argument(missingParameters);
     const string extension = tryGetExtension(path);
     cout << "Decrypt, path:" << path << endl;
-    if (extension == ".bmp") {
-        fstream file(path, ios::in | ios::binary);
-        file.seekg(0, ios::end);
-        long size = file.tellg();
-        int offset = 0;
-        int bitPerPixel = 0;
-        int biWidth = 0;
-        int biHeight = 0;
-        // READ HEADER DATA
-        file.seekg(10, ios::beg);
-        for (int i = 0; i < 4; i++) {
-            offset += (file.get() << 8 * i);
-        }
-        file.seekg(28, ios::beg);
-        for (int i = 0; i < 2; i++) {
-            bitPerPixel += (file.get() << 8 * i);
-        }
-        file.seekg(18, ios::beg);
-        for (int i = 0; i < 4; i++) {
-            biWidth += (file.get() << 8 * i);
-        }
-        file.seekg(22, ios::beg);
-        for (int i = 0; i < 4; i++) {
-            biHeight += (file.get() << 8 * i);
-        }
-        char c = 0;
-        char *message = new char[size];
-        int currOffset = offset - 3;
-        vector<char8_t> bits = {BIT_ONE, BIT_TWO, BIT_THREE, BIT_FOUR, BIT_FIVE, BIT_SIX, BIT_SEVEN,
-                                BIT_EIGHT};
+    fstream file(path, ios::in | ios::binary);
+    char read = 0;
 
+    file.seekg(0, ios::end);
+    long size = file.tellg();
+
+    if (extension == ".bmp") {
+        int offset;
+        int bitPerPixel;
+        char *message = new char[size];
+        readBmpHeader(file, offset, bitPerPixel);
+        int currOffset = offset - 3;
         for (int i = 0; i < size / bitPerPixel; i++) {
             for (char8_t b: bits) {
                 file.seekg(currOffset += bitPerPixel / 8, ios::beg);
-                c = file.get();
-                message[i] += (c & b);
+                read = (char) file.get();
+                message[i] += (char) (read & b);
             }
             if (message[i] == 'D') {
-                if (string(message).substr(strlen(message)-4,4) == "/END") {
+                if (string(message).substr(strlen(message) - 4, 4) == "/END") {
                     break;
                 }
             }
         }
         cout << "Decrypted message: " << string(message).erase(strlen(message) - 4) << endl;
         delete[] message;
-        file.close();
-        clock_t stop = clock();
-        double elapsed = (double) (stop - start) / CLOCKS_PER_SEC;
-        printf("\nTime elapsed: %.5f\n", elapsed);
     }
+    if (extension == ".ppm") {
+
+    }
+
+    file.close();
 }
 
 void check(const char *&path, const char *&message) {
