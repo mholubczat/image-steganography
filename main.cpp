@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
-
 #include <sys/stat.h>
 #include <vector>
 
@@ -13,7 +12,7 @@
 #define BIT_SIX 0x20
 #define BIT_SEVEN 0x40
 #define BIT_EIGHT 0x80
-#define BITS_TWO_EIGHT 0XFE
+#define BITS_TWO_EIGHT 0xFE
 
 using namespace std;
 
@@ -77,7 +76,7 @@ int main(int argc, char *argv[]) {
 
 const string missingParameters = "Missing parameter(s). Enter -h for more information.";
 
-vector<int> bits = {BIT_ONE, BIT_TWO, BIT_THREE, BIT_FOUR, BIT_FIVE, BIT_SIX, BIT_SEVEN, BIT_EIGHT};
+vector<char8_t> bits = {BIT_EIGHT, BIT_SEVEN, BIT_SIX, BIT_FIVE, BIT_FOUR, BIT_THREE, BIT_TWO, BIT_ONE};
 #ifdef WIN32
 #define stat _stat
 #endif
@@ -122,7 +121,7 @@ int readAsciiInt(fstream &file, ofstream &newFile) {
 
 void encryptAsciiPpm(const string &myMessage, ofstream &newFile, fstream &file) {
     char read, temp;
-    for (char msgCounter: myMessage) {
+    for (char messageChar: myMessage) {
         for (uint8_t b: bits) {
             readAsciiInt(file, newFile);
             readAsciiInt(file, newFile);
@@ -135,7 +134,7 @@ void encryptAsciiPpm(const string &myMessage, ofstream &newFile, fstream &file) 
                 read = (char) file.get();
                 if (read < '0') {
                     temp = (char) (temp & BITS_TWO_EIGHT);
-                    if ((msgCounter & b) != 0) temp++;
+                    if ((messageChar & b) != 0) temp++;
                 }
                 newFile.put(temp);
             }
@@ -145,8 +144,8 @@ void encryptAsciiPpm(const string &myMessage, ofstream &newFile, fstream &file) 
 }
 
 void readBmpHeader(fstream &file, int &offset, int &bitPerPixel) {
-    offset= 0;
-    bitPerPixel= 0;
+    offset = 0;
+    bitPerPixel = 0;
     int biWidth = 0;
     int biHeight = 0;
     // READ HEADER DATA
@@ -230,8 +229,8 @@ void encrypt(const char *&path, const char *&message) {
     if (extension == ".ppm") {
         bool isAscii;
         readPpmHeader(newFile, file, isAscii);
-        if(isAscii)
-        encryptAsciiPpm(myMessage, newFile, file);
+        if (isAscii)
+            encryptAsciiPpm(myMessage, newFile, file);
         else;
         while (file.good()) {
             read = (char) file.get();
@@ -261,8 +260,8 @@ void decrypt(const char *&path) {
         for (int i = 0; i < size / bitPerPixel; i++) {
             for (char8_t b: bits) {
                 file.seekg(currOffset += bitPerPixel / 8, ios::beg);
-                read = (char) file.get();
-                message[i] += (char) (read & b);
+                read = (char8_t) file.get();
+                message[i] += (char8_t) (read & b);
             }
             if (message[i] == 'D') {
                 if (string(message).substr(strlen(message) - 4, 4) == "/END") {
@@ -274,9 +273,40 @@ void decrypt(const char *&path) {
         delete[] message;
     }
     if (extension == ".ppm") {
+        auto *message = new char [size];
+        bool isAscii;
+        ofstream nullStream = ofstream();
+        nullStream.setstate(ios::badbit);
+        readPpmHeader(nullStream, file, isAscii);
+        for (int i = 0; i < size / 3; i++) {
+            char temp;
+            message[i] = 0;
+            for (char8_t b: bits) {
+                readAsciiInt(file, nullStream);
+                readAsciiInt(file, nullStream);
+                do {
+                    read = (char) file.get();
+                } while (read < '0');
+                while (read >= '0') {
+                    temp = read;
+                    read = (char) file.get();
+                    if (read < '0') {
+                        message[i] <<= 1;
+                        message[i] += (temp & BIT_ONE);
+                    }
+                }
+            }
+            if (message[i] == 'D' || i > 6) {
+                break;
+                if (string(message).substr(strlen(message) - 4, 4) == "/END") {
+                    break;
+                }
+            }
+        }
 
+        cout << "Decrypted message: " << string(message).erase(strlen(message) - 4) << endl;
+        delete[] message;
     }
-
     file.close();
 }
 
