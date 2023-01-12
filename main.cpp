@@ -123,6 +123,7 @@ void encryptAsciiPpm(const string &myMessage, ofstream &newFile, fstream &file) 
     char read, temp;
     for (char messageChar: myMessage) {
         for (uint8_t b: bits) {
+
             readAsciiInt(file, newFile);
             readAsciiInt(file, newFile);
             do {
@@ -141,6 +142,25 @@ void encryptAsciiPpm(const string &myMessage, ofstream &newFile, fstream &file) 
             newFile.put(read);
         }
     }
+}
+
+void encryptRawPpm(const string &myMessage, ofstream &newFile, fstream &file) {
+    char read;
+    do {
+        read = (char) file.get();
+        if (read < '0') newFile.put(read);
+    } while (read < '0');
+    for (char messageChar: myMessage) {
+        for (uint8_t b: bits) {
+            read = (read & BITS_TWO_EIGHT);
+            if ((messageChar & b) != 0) read++;
+            newFile.put(read);
+            newFile.put((char) file.get());
+            newFile.put((char) file.get());
+            read = (char) file.get();
+        }
+    }
+    newFile.put(read);
 }
 
 void readBmpHeader(fstream &file, int &offset, int &bitPerPixel) {
@@ -231,7 +251,7 @@ void encrypt(const char *&path, const char *&message) {
         readPpmHeader(newFile, file, isAscii);
         if (isAscii)
             encryptAsciiPpm(myMessage, newFile, file);
-        else;
+        else encryptRawPpm(myMessage, newFile, file);
         while (file.good()) {
             read = (char) file.get();
             newFile.put(read);
@@ -239,6 +259,55 @@ void encrypt(const char *&path, const char *&message) {
     }
     newFile.close();
     file.close();
+}
+
+void decryptAsciiPpm(fstream &file, long size, char *&message, ofstream &nullStream) {
+    char temp, read;
+    for (int i = 0; i < size / 3; i++) {
+        message[i] = 0;
+        for (char8_t b: bits) {
+            readAsciiInt(file, nullStream);
+            readAsciiInt(file, nullStream);
+            do {
+                read = (char) file.get();
+            } while (read < '0');
+            while (read >= '0') {
+                temp = read;
+                read = (char) file.get();
+                if (read < '0') {
+                    message[i] <<= 1;
+                    message[i] += (temp & BIT_ONE);
+                }
+            }
+        }
+        if (message[i] == 'D') {
+            if (string(message).substr(strlen(message) - 4, 4) == "/END") {
+                break;
+            }
+        }
+    }
+}
+
+void decryptRawPpm(fstream &file, long size, char *&message) {
+    char read;
+    do {
+        read = (char) file.get();
+    } while (read < '0');
+    for (int i = 0; i < size / 3; i++) {
+        message[i] = 0;
+        for (char8_t b: bits) {
+            message[i] <<= 1;
+            message[i] += (read & BIT_ONE);
+            file.get();
+            file.get();
+            read = (char)file.get();
+        }
+        if (message[i] == 'D') {
+            if (string(message).substr(strlen(message) - 4, 4) == "/END") {
+                break;
+            }
+        }
+    }
 }
 
 void decrypt(const char *&path) {
@@ -273,37 +342,13 @@ void decrypt(const char *&path) {
         delete[] message;
     }
     if (extension == ".ppm") {
-        auto *message = new char [size];
+        auto *message = new char[size];
         bool isAscii;
         ofstream nullStream = ofstream();
         nullStream.setstate(ios::badbit);
         readPpmHeader(nullStream, file, isAscii);
-        for (int i = 0; i < size / 3; i++) {
-            char temp;
-            message[i] = 0;
-            for (char8_t b: bits) {
-                readAsciiInt(file, nullStream);
-                readAsciiInt(file, nullStream);
-                do {
-                    read = (char) file.get();
-                } while (read < '0');
-                while (read >= '0') {
-                    temp = read;
-                    read = (char) file.get();
-                    if (read < '0') {
-                        message[i] <<= 1;
-                        message[i] += (temp & BIT_ONE);
-                    }
-                }
-            }
-            if (message[i] == 'D' || i > 6) {
-                break;
-                if (string(message).substr(strlen(message) - 4, 4) == "/END") {
-                    break;
-                }
-            }
-        }
-
+        if (isAscii) decryptAsciiPpm(file, size, message, nullStream);
+        else decryptRawPpm(file, size, message);
         cout << "Decrypted message: " << string(message).erase(strlen(message) - 4) << endl;
         delete[] message;
     }
