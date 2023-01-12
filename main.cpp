@@ -235,7 +235,8 @@ void encrypt(const char *&path, const char *&message) {
             } else {
                 for (; msgCounter < myMessage.length(); msgCounter++) {
                     for (uint8_t b: bits) {
-                        read = (char) ((file.get() & (~b)) + (myMessage[msgCounter] & b));
+                        read = (char) (file.get() & BITS_TWO_EIGHT);
+                        if((myMessage[msgCounter] & b) != 0) read++;
                         newFile.put(read);
                         for (int j = 1; j < bitPerPixel / 8; j++) {
                             newFile.put((char) file.get());
@@ -327,10 +328,12 @@ void decrypt(const char *&path) {
         readBmpHeader(file, offset, bitPerPixel);
         int currOffset = offset - 3;
         for (int i = 0; i < size / bitPerPixel; i++) {
+            message[i] = 0;
             for (char8_t b: bits) {
                 file.seekg(currOffset += bitPerPixel / 8, ios::beg);
                 read = (char8_t) file.get();
-                message[i] += (char8_t) (read & b);
+                message[i] <<= 1;
+                message[i] += (char8_t) (read & BIT_ONE);
             }
             if (message[i] == 'D') {
                 if (string(message).substr(strlen(message) - 4, 4) == "/END") {
