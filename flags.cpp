@@ -118,14 +118,28 @@ void flags::decrypt(const char *&path) {
         bool isAscii;
         util::readPpmHeader(file, offset, width, height, isAscii);
         if (isAscii) {
-          message = encrypt::decryptAsciiPpm(file, width, height, offset);
+            message = encrypt::decryptAsciiPpm(file, width, height, offset);
         } else { message = encrypt::decryptRawPpm(file, width, height, offset); }
     }
-    cout << "Decrypted message: " << string(message).erase(strlen(message) - 4) << endl;
-    delete[] message;
+
+    if (message != nullptr) {
+        cout << "Decrypted message: " << string(message).erase(strlen(message) - 4) << endl;
+        delete[] message;
+    } else cout << "No message found!" << endl;
     file.close();
 }
 
 void flags::help() {
     cout << "Help: " << endl;
+    cout << "Simple image steganography tool" << endl;
+    cout << "Supported extensions: .bmp, .ppm \n16-bit .ppm extensions are not supported" << endl;
+    cout << "Command list:" << endl;
+    cout << "-i (or --info)\t\t[path]\t\t\tImage info: extension, size, modification date" << endl;
+    cout << "-c (or --check)\t\t[path][message]\tVerify if the *message* can be encrypted in a file located in *path*"
+         << endl;
+    cout
+            << "-e (or --encrypt)\t[path][message]\tEncrypt the *message* in a file located in *path*. New file will be created."
+            << endl;
+    cout << "-d (or --decrypt)\t[path]\t\t\tDecrypt message from the file located in *path*." << endl;
+    cout << "-h (or --help)\t\t\t\t\t\tHelp" << endl;
 }

@@ -18,6 +18,14 @@ string util::tryGetExtension(const char *&path) {
     return extension;
 }
 
+/**
+ * Read .bmp file header data
+ * @param file input stream
+ * @param offset start position of pixel data in the file
+ * @param width image width in px
+ * @param height image height in px
+ * @param bitPerPixel bits used to store single pixel data
+ */
 void util::readBmpHeader(ifstream &file, long &offset, size_t &width, size_t &height, int &bitPerPixel) {
     offset = 0;
     width = 0;
@@ -43,6 +51,16 @@ void util::readBmpHeader(ifstream &file, long &offset, size_t &width, size_t &he
     file.seekg(0, ios::beg);
 }
 
+/**
+ * Read .ppm file header data
+ * @param file input stream
+ * @param offset start position of pixel data in the file
+ * @param width image width in px
+ * @param height image height in px
+ * @param isAscii true : plain PPM format - RGB data represented as ASCII decimal
+ *                false : raw PPM format - RGB data represented binary
+ *                NOTE : header data always in ASCII decimal format
+ */
 void util::readPpmHeader(ifstream &file, long &offset, size_t &width, size_t &height, bool &isAscii) {
     char read;
     file.seekg(0, ios::beg);
@@ -67,12 +85,17 @@ void util::readPpmHeader(ifstream &file, long &offset, size_t &width, size_t &he
     file.seekg(0, ios::beg);
 }
 
+/**
+ *
+ * @param file input stream
+ * @return single ASCII number extracted from PPM file
+ */
 size_t util::readAsciiInt(ifstream &file) {
     int res = 0;
     char read;
     do {
         read = (char) file.get();
-        if(read == '#'){
+        if (read == '#') {
             file.getline(nullptr, 70);
         }
     } while (read < '0');
@@ -86,6 +109,11 @@ size_t util::readAsciiInt(ifstream &file) {
     return res;
 }
 
+/**
+ * Copy Ascii data and white space between files
+ * @param file input stream
+ * @param newFile output stream
+ */
 void util::reWriteAsciiInt(ifstream &file, ofstream &newFile) {
     char read;
     do {

@@ -19,9 +19,15 @@ using namespace std;
 
 const vector<char8_t> bits = {BIT_EIGHT, BIT_SEVEN, BIT_SIX, BIT_FIVE, BIT_FOUR, BIT_THREE, BIT_TWO, BIT_ONE};
 
-
-void
-encrypt::encryptBmp(const string &myMessage, ofstream &newFile, ifstream &file, size_t offset, size_t bitPerPixel) {
+/**
+ * Encrypt message into .bmp file
+ * @param myMessage enctypted message
+ * @param newFile output stream
+ * @param file input stream
+ * @param offset start position of pixel data in the file
+ * @param bitPerPixel bits used to store single pixel data
+ */
+void encrypt::encryptBmp(const string &myMessage, ofstream &newFile, ifstream &file, size_t offset, size_t bitPerPixel) {
     char read;
     while (file.tellg() < offset) {
         newFile.put((char) file.get());
@@ -39,6 +45,13 @@ encrypt::encryptBmp(const string &myMessage, ofstream &newFile, ifstream &file, 
     }
 }
 
+/**
+ * Encrypt message into raw .ppm file
+ * @param myMessage enctypted message
+ * @param newFile output stream
+ * @param file input stream
+ * @param offset start position of pixel data in the file
+ */
 void encrypt::encryptRawPpm(const string &myMessage, ofstream &newFile, ifstream &file, size_t offset) {
     char read;
     for(int i = 0; i < offset; i++){
@@ -63,6 +76,13 @@ void encrypt::encryptRawPpm(const string &myMessage, ofstream &newFile, ifstream
     }
 }
 
+/**
+ * Encrypt message into plain .ppm file
+ * @param myMessage encrtypted message
+ * @param newFile output stream
+ * @param file input stream
+ * @param offset start position of pixel data in the file
+ */
 void encrypt::encryptAsciiPpm(const string &myMessage, ofstream &newFile, ifstream &file, size_t offset) {
     char read, temp;
     for(int i = 0; i < offset; i++){
@@ -96,6 +116,15 @@ void encrypt::printBits(char c) {
          << ((c & BIT_TWO) >> 1) << ((c & BIT_ONE)) << endl;
 }
 
+/**
+ * Extract message from .bmp file
+ * @param file input stream
+ * @param width image width in px
+ * @param height image height in px
+ * @param offset start position of pixel data in the file
+ * @param bitPerPixel bits used to store single pixel data
+ * @return extracted message
+ */
 char *encrypt::decryptBmp(ifstream &file, size_t width, size_t height, long offset, int bitPerPixel) {
     char *message = new char[width * height / 8];
     long currOffset = offset - 3;
@@ -108,13 +137,22 @@ char *encrypt::decryptBmp(ifstream &file, size_t width, size_t height, long offs
         }
         if (message[i] == 'D') {
             if (string(message).substr(strlen(message) - 4, 4) == "/END") {
-                break;
+                return message;
             }
         }
     }
-    return message;
+    delete[] message;
+    return nullptr;
 }
 
+/**
+ * Extract message from raw .ppm file
+ * @param file input stream
+ * @param width image width in px
+ * @param height image height in px
+ * @param offset start position of pixel data in the file
+ * @return extracted message
+ */
 char *encrypt::decryptRawPpm(ifstream &file, size_t width, size_t height, long offset) {
     char *message = new char[width * height / 8];
     char read;
@@ -133,13 +171,22 @@ char *encrypt::decryptRawPpm(ifstream &file, size_t width, size_t height, long o
         }
         if (message[i] == 'D') {
             if (string(message).substr(strlen(message) - 4, 4) == "/END") {
-                break;
+                return message;
             }
         }
     }
-    return message;
+    delete[] message;
+    return nullptr;
 }
 
+/**
+ * Extract message from plain .ppm file
+ * @param file input stream
+ * @param width image width in px
+ * @param height image height in px
+ * @param offset start position of pixel data in the file
+ * @return extracted message
+ */
 char *encrypt::decryptAsciiPpm(ifstream &file, size_t width, size_t height, long offset) {
     char *message = new char[width * height / 8];
     char temp, read;
@@ -163,9 +210,10 @@ char *encrypt::decryptAsciiPpm(ifstream &file, size_t width, size_t height, long
         }
         if (message[i] == 'D') {
             if (string(message).substr(strlen(message) - 4, 4) == "/END") {
-                break;
+                return message;
             }
         }
     }
-    return message;
+    delete[] message;
+    return nullptr;
 }
