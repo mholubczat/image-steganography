@@ -22,7 +22,7 @@ void encrypt(const char *&path, const char *&message);
 
 void decrypt(const char *&path);
 
-void check(const char *&path, const char *&message);
+bool check(const char *&path, const char *&message);
 
 void help();
 
@@ -97,9 +97,9 @@ void info(const char *&path) {
     if (stat(path, &fileStats) != 0) throw invalid_argument("File not found.");
 
     cout << "Extension:" << '\t' << tryGetExtension(path) << endl;
-    cout << "Size:\t" << '\t' << fileStats.st_size << endl;
-    cout << "Size on disk: " << '\t' << fileStats.st_blocks * 512 << endl;
-    cout << "Last modified: " << '\t' << fileStats.st_mtime << endl;
+    cout << "Size:\t" << '\t' << fileStats.st_size << " bytes" << endl;
+    cout << "Size on disk: " << '\t' << fileStats.st_blocks * 512 << " bytes" << endl;
+    cout << "Last modified: " << '\t' << fileStats.st_mtime << " seconds since Unix epoch" << endl;
 }
 
 //TODO add some try catch? for larger chars. and discard comments: from # to /r or /n
@@ -160,14 +160,16 @@ void encryptRawPpm(const string &myMessage, ofstream &newFile, fstream &file) {
             read = (char) file.get();
         }
     }
-    newFile.put(read);
+    if(file.good()) {
+        newFile.put(read);
+    }
 }
 
-void readBmpHeader(fstream &file, int &offset, int &bitPerPixel) {
+void readBmpHeader(fstream &file, int &offset, int &bitPerPixel, int &width, int &height) {
     offset = 0;
     bitPerPixel = 0;
-    int biWidth = 0;
-    int biHeight = 0;
+    width = 0;
+    height = 0;
     // READ HEADER DATA
     file.seekg(10, ios::beg);
     for (int i = 0; i < 4; i++) {
@@ -179,16 +181,16 @@ void readBmpHeader(fstream &file, int &offset, int &bitPerPixel) {
     }
     file.seekg(18, ios::beg);
     for (int i = 0; i < 4; i++) {
-        biWidth += (file.get() << 8 * i);
+        width += (file.get() << 8 * i);
     }
     file.seekg(22, ios::beg);
     for (int i = 0; i < 4; i++) {
-        biHeight += (file.get() << 8 * i);
+        height += (file.get() << 8 * i);
     }
     file.seekg(0, ios::beg);
 }
 
-void readPpmHeader(ofstream &newFile, fstream &file, bool &isAscii) {
+void readPpmHeader(ofstream &newFile, fstream &file, bool &isAscii, int& width, int& height) {
     char read;
     file.seekg(0, ios::beg);
     read = (char) file.get();
@@ -206,8 +208,8 @@ void readPpmHeader(ofstream &newFile, fstream &file, bool &isAscii) {
         default:
             throw invalid_argument("Incorrect data. The file is corrupted.");
     }
-    int width = readAsciiInt(file, newFile);
-    int height = readAsciiInt(file, newFile);
+    width = readAsciiInt(file, newFile);
+    height = readAsciiInt(file, newFile);
     int maxVal = readAsciiInt(file, newFile);
     if (maxVal > 255) throw invalid_argument("File not supported");
 }
@@ -216,6 +218,7 @@ void encrypt(const char *&path, const char *&message) {
     if (!path || !message) throw invalid_argument(missingParameters);
     string extension = tryGetExtension(path);
     string myMessage = string(message).append("/END");
+    if(!check(path, message)) throw invalid_argument("Encryption aborted");
     cout << "Encrypt, path: " << path << " message: " << message << endl;
     string newFilePath = string(path).substr(0, strlen(path) - 4).append(" encrypted").append(extension);
     ofstream newFile(newFilePath, ios::binary);
@@ -227,7 +230,9 @@ void encrypt(const char *&path, const char *&message) {
     if (extension == ".bmp") {
         int offset;
         int bitPerPixel;
-        readBmpHeader(file, offset, bitPerPixel);
+        int width;
+        int height;
+        readBmpHeader(file, offset, bitPerPixel, width, height);
         for (int i = 0; i < size; i++) {
             if (msgCounter >= myMessage.length() || i < offset) {
                 read = (char) file.get();
@@ -249,7 +254,8 @@ void encrypt(const char *&path, const char *&message) {
     }
     if (extension == ".ppm") {
         bool isAscii;
-        readPpmHeader(newFile, file, isAscii);
+        int width, height;
+        readPpmHeader(newFile, file, isAscii, width, height);
         if (isAscii)
             encryptAsciiPpm(myMessage, newFile, file);
         else encryptRawPpm(myMessage, newFile, file);
@@ -325,7 +331,9 @@ void decrypt(const char *&path) {
         int offset;
         int bitPerPixel;
         char *message = new char[size];
-        readBmpHeader(file, offset, bitPerPixel);
+        int width;
+        int height;
+        readBmpHeader(file, offset, bitPerPixel, width, height);
         int currOffset = offset - 3;
         for (int i = 0; i < size / bitPerPixel; i++) {
             message[i] = 0;
@@ -349,7 +357,8 @@ void decrypt(const char *&path) {
         bool isAscii;
         ofstream nullStream = ofstream();
         nullStream.setstate(ios::badbit);
-        readPpmHeader(nullStream, file, isAscii);
+        int width, height;
+        readPpmHeader(nullStream, file, isAscii, width, height);
         if (isAscii) decryptAsciiPpm(file, size, message, nullStream);
         else decryptRawPpm(file, size, message);
         cout << "Decrypted message: " << string(message).erase(strlen(message) - 4) << endl;
@@ -358,11 +367,35 @@ void decrypt(const char *&path) {
     file.close();
 }
 
-void check(const char *&path, const char *&message) {
+bool check(const char *&path, const char *&message) {
     if (!path || !message) throw invalid_argument(missingParameters);
     string extension = tryGetExtension(path);
     cout << "Check, path: " << path << " message: " << message << endl;
+    fstream file(path, ios::in | ios::binary);
+    int myMsgLength = strlen(message)+4;
+    int width;
+    int height;
+    if (extension == ".bmp") {
+        int offset;
+        int bitPerPixel;
+        readBmpHeader(file, offset, bitPerPixel, width, height);
+    }
+    if (extension == ".ppm") {
+        ofstream nullStream = ofstream();
+        nullStream.setstate(ios::badbit);
+        bool isAscii;
+        readPpmHeader(nullStream, file, isAscii, width, height);
+    }
+    bool canEncrypt = width * height / 8 > myMsgLength;
+    if (canEncrypt){
+        cout << "Message can be encrypted in the file" <<endl;
+    } else {
+        cout << "Message cannot be encrypted in the file" <<endl;
+    }
+    file.close();
+    return(canEncrypt);
 }
+
 
 void help() {
     cout << "Help" << endl;
